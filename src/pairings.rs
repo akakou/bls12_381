@@ -4,7 +4,6 @@ use crate::fp2::Fp2;
 use crate::fp6::Fp6;
 use crate::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar, BLS_X, BLS_X_IS_NEGATIVE};
 
-use alloc::fmt;
 use core::borrow::Borrow;
 use core::convert::TryInto;
 use core::iter::Sum;
@@ -14,6 +13,8 @@ use pairing::{Engine, PairingCurveAffine};
 use rand_core::RngCore;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
+#[cfg(feature = "alloc")]
+use alloc::fmt;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
@@ -188,6 +189,7 @@ impl_add_binop_specify_output!(MillerLoopResult, MillerLoopResult, MillerLoopRes
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Gt(pub(crate) Fp12);
 
+#[cfg(feature = "alloc")]
 impl fmt::Display for Gt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
@@ -463,18 +465,21 @@ impl fmt::Debug for GtCompressed {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Default for GtCompressed {
     fn default() -> Self {
         GtCompressed([0; 48 * 12])
     }
 }
 
+#[cfg(feature = "alloc")]
 impl AsRef<[u8]> for GtCompressed {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
+#[cfg(feature = "alloc")]
 impl AsMut<[u8]> for GtCompressed {
     fn as_mut(&mut self) -> &mut [u8] {
         &mut self.0
