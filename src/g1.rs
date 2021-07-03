@@ -1014,7 +1014,7 @@ impl UncompressedEncoding for G1Affine {
 
 #[cfg(feature = "serde")]
 mod serde_support {
-    use super::{G1Affine, G1Projective, fmt};
+    use super::{fmt, G1Affine, G1Projective};
 
     use serde::de::Visitor;
     use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
@@ -1053,9 +1053,9 @@ mod serde_support {
                 {
                     let mut bytes = [0u8; 48];
                     for i in 0..48 {
-                        bytes[i] = seq
-                            .next_element()?
-                            .ok_or_else(|| serde::de::Error::invalid_length(i, &"expected 48 bytes"))?;
+                        bytes[i] = seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::invalid_length(i, &"expected 48 bytes")
+                        })?;
                     }
 
                     let res = G1Affine::from_compressed(&bytes);
@@ -1094,8 +1094,6 @@ mod serde_support {
 
 #[cfg(feature = "serde")]
 pub use self::serde_support::*;
-
-
 
 #[test]
 fn test_is_on_curve() {

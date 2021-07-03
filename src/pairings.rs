@@ -4,14 +4,15 @@ use crate::fp2::Fp2;
 use crate::fp6::Fp6;
 use crate::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar, BLS_X, BLS_X_IS_NEGATIVE};
 
+use alloc::fmt;
 use core::borrow::Borrow;
-use core::fmt;
+use core::convert::TryInto;
 use core::iter::Sum;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use group::Group;
+use group::{Group, GroupEncoding};
 use pairing::{Engine, PairingCurveAffine};
 use rand_core::RngCore;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -453,6 +454,114 @@ impl Group for Gt {
 }
 
 #[cfg(feature = "alloc")]
+pub struct GtCompressed([u8; 48 * 12]);
+
+#[cfg(feature = "alloc")]
+impl fmt::Debug for GtCompressed {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0[..].fmt(f)
+    }
+}
+
+impl Default for GtCompressed {
+    fn default() -> Self {
+        GtCompressed([0; 48 * 12])
+    }
+}
+
+impl AsRef<[u8]> for GtCompressed {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsMut<[u8]> for GtCompressed {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl GroupEncoding for Gt {
+    type Repr = GtCompressed;
+    fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
+        Self::from_bytes_unchecked(bytes);
+        unimplemented!();
+    }
+
+    fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
+        let mut fp_list = alloc::vec![];
+
+        // 12 = 12 * 12 / 12
+        for i in 0..12 {
+            let start = i * 48;
+            let end = i * 48 + 48;
+
+            let splited = bytes.as_ref()[start..end].try_into().expect("Cast error");
+            let fp = Fp::from_bytes(splited).unwrap();
+
+            fp_list.push(fp);
+        }
+
+        let mut fp2_list = alloc::vec![];
+
+        // 6 = 12 / 2
+        for i in 0..6 {
+            let i0 = i * 2;
+            let i1 = i * 2 + 1;
+
+            let fp2 = Fp2 {
+                c0: fp_list[i0],
+                c1: fp_list[i1],
+            };
+
+            fp2_list.push(fp2);
+        }
+
+        let gt = Gt(Fp12 {
+            c0: Fp6 {
+                c0: fp2_list[0],
+                c1: fp2_list[1],
+                c2: fp2_list[2],
+            },
+            c1: Fp6 {
+                c0: fp2_list[3],
+                c1: fp2_list[4],
+                c2: fp2_list[5],
+            },
+        });
+
+        CtOption::new(gt, Choice::from(1))
+    }
+
+    fn to_bytes(&self) -> Self::Repr {
+        let fp6_list = [self.0.c0, self.0.c1];
+
+        let mut fp2_list = alloc::vec![];
+        for fp6 in fp6_list.iter() {
+            fp2_list.push(fp6.c0);
+            fp2_list.push(fp6.c1);
+            fp2_list.push(fp6.c2);
+        }
+
+        let mut fp_list = alloc::vec![];
+        for fp2 in fp2_list.iter() {
+            fp_list.push(fp2.c0);
+            fp_list.push(fp2.c1);
+        }
+
+        let mut result = alloc::vec![];
+        for fp in fp_list.iter() {
+            result.append(&mut fp.to_bytes().to_vec());
+        }
+
+        let result = result.try_into().expect("Cast error");
+
+        GtCompressed(result)
+    }
+}
+
+#[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "pairings", feature = "alloc"))))]
 #[derive(Clone, Debug)]
 /// This structure contains cached computations pertaining to a $\mathbb{G}_2$
@@ -886,4 +995,20 @@ fn test_multi_miller_loop() {
     .final_exponentiation();
 
     assert_eq!(expected, test);
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn test_gt_compress() {
+    use rand_core::SeedableRng;
+    let rng = rand_xorshift::XorShiftRng::from_seed([
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
+        0xe5,
+    ]);
+
+    let a = Gt::random(rng);
+    let bytes = a.to_bytes();
+    let b = Gt::from_bytes_unchecked(&bytes).unwrap();
+
+    assert_eq!(a, b);
 }

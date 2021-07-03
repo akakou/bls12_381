@@ -1201,7 +1201,7 @@ impl UncompressedEncoding for G2Affine {
 
 #[cfg(feature = "serde")]
 mod serde_support {
-    use super::{G2Affine, G2Projective, fmt};
+    use super::{fmt, G2Affine, G2Projective};
 
     use serde::de::Visitor;
 
@@ -1241,9 +1241,9 @@ mod serde_support {
                 {
                     let mut bytes = [0u8; 96];
                     for i in 0..96 {
-                        bytes[i] = seq
-                            .next_element()?
-                            .ok_or_else(|| serde::de::Error::invalid_length(i, &"expected 96 bytes"))?;
+                        bytes[i] = seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::invalid_length(i, &"expected 96 bytes")
+                        })?;
                     }
 
                     let res = G2Affine::from_compressed(&bytes);

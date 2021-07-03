@@ -797,7 +797,7 @@ where
 
 #[cfg(feature = "serde")]
 mod serde_support {
-    use super::{Scalar, fmt};
+    use super::{fmt, Scalar};
 
     use serde::de::Visitor;
     use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
@@ -835,9 +835,9 @@ mod serde_support {
                 {
                     let mut bytes = [0u8; 32];
                     for i in 0..32 {
-                        bytes[i] = seq
-                            .next_element()?
-                            .ok_or_else(|| serde::de::Error::invalid_length(i, &"expected 32 bytes"))?;
+                        bytes[i] = seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::invalid_length(i, &"expected 32 bytes")
+                        })?;
                     }
 
                     let res = Scalar::from_bytes(&bytes);
